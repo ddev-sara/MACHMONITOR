@@ -1,0 +1,79 @@
+---
+- name: start instance {{inventory_hostname}} with a public IP address at 1a
+  amazon.aws.ec2_instance:
+    aws_access_key: "{{aws_access_key_id}}"
+    aws_secret_key: "{{aws_secret_access_key}}"
+    name: "{{hostvars[inventory_hostname].inventory_hostname}}"
+    key_name: "{{ pem_key }}"
+    vpc_subnet_id: "{{ public1_subnet_id }}"
+    instance_type: "{{ ec2_instance_type }}"
+    region: "{{ region }}"
+    # availability_zone: "{{ zone_1a }}"
+    security_group: "{{ security_group_id }}"
+    network:
+      assign_public_ip: true
+      private_ip_address: "{{ ansible_host_private }}"
+      subnet_id: "{{ public1_subnet_id }}"
+    image_id: "{{ ec2_image_id }}"
+    tags:
+      Environment: Monitor
+  when: (inventory_hostname in groups['aws_public_1a'])
+  delegate_to: localhost
+ 
+- name: start {{inventory_hostname}} instance with a private IP address at 1a
+  amazon.aws.ec2_instance:
+    name: "{{inventory_hostname}}"
+    key_name: "{{ pem_key }}"
+    vpc_subnet_id: "{{ private1_subnet_id }}"
+    instance_type: "{{ ec2_instance_type }}"
+    region: "{{ region }}"
+    # availability_zone: "{{ zone_1a }}"
+    security_group: "{{ security_group_id }}"
+    network:
+      assign_public_ip: false
+      private_ip_address: "{{ansible_host_private}}"
+      subnet_id: "{{ private1_subnet_id }}"
+    image_id: "{{ ec2_image_id }}"
+    tags:
+      Environment: Monitor
+  when: (inventory_hostname in groups['aws_private_1a'])
+  delegate_to: localhost
+ 
+- name: start instance {{inventory_hostname}} with a public IP address at 1b
+  amazon.aws.ec2_instance:
+    name: "{{inventory_hostname}}"
+    key_name: "{{ pem_key }}"
+    vpc_subnet_id: "{{ public2_subnet_id }}"
+    instance_type: "{{ ec2_instance_type }}"
+    region: "{{ region }}"
+    # availability_zone: "{{ zone_1a }}"
+    security_group: "{{ security_group_id }}"
+    network:
+      assign_public_ip: true
+      private_ip_address: "{{ ansible_host_private }}"
+      subnet_id: "{{ public2_subnet_id }}"
+    image_id: "{{ ec2_image_id }}"
+    tags:
+      Environment: Monitor
+  when: (inventory_hostname in groups['aws_public_1b'])
+  delegate_to: localhost
+ 
+- name: start {{inventory_hostname}} instance with a private IP address at 1b
+  amazon.aws.ec2_instance:
+    name: "{{inventory_hostname}}"
+    key_name: "{{ pem_key }}"
+    vpc_subnet_id: "{{ private2_subnet_id }}"
+    instance_type: "{{ ec2_instance_type }}"
+    region: "{{ region }}"
+    # availability_zone: "{{ zone_1b }}"
+    security_group: "{{ security_group_id }}"
+    network:
+      assign_public_ip: false
+      private_ip_address: "{{ansible_host_private}}"
+      subnet_id: "{{ private2_subnet_id }}"
+    image_id: "{{ ec2_image_id }}"
+    tags:
+      Environment: Monitor
+  when: (inventory_hostname in groups['aws_private_1b'])
+  delegate_to: localhost
+ 

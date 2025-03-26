@@ -1,0 +1,118 @@
+---
+#Common.settings
+title: "Monitor"
+vpc_name: "{{ title }} SARADASH"
+igw_name: "{{ title }} SARADASH"
+nat_name: "{{ title }} SARADASH"
+security_group_name: "{{ title }} SARADASH"
+#aws configuration
+aws_access_key_id: "AKIA2CVFZCSU4MJTNN7A"
+aws_secret_access_key: "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"
+vpc_cidr_block: '10.46.0.0/16'
+public1a_subnet_cidr_block: '10.46.0.0/24'
+public1b_subnet_cidr_block: '10.46.2.0/24'
+private1a_subnet_cidr_block: '10.46.1.0/24'
+private1b_subnet_cidr_block: '10.46.3.0/24'
+region: "ap-southeast-1"
+vpc_state: present
+internet_cidr_block: '0.0.0.0/0'
+zone_1a: "ap-southeast-1a"
+zone_1b: "ap-southeast-1b"
+key_pair_name: 'SARAKEYPAIRNEW'
+pem_key: 'SARAKEYPAIRNEW'
+enable_vpc: true
+enable_ec2: true #set to false once ec2 created
+# image_id: "ami-03f0544597f43a91d"
+ec2_instance_type: "t3.medium"
+#state=present: ensure instances exist, but does not guarantee any state (eg. running) . Newly launched
+#state=running: state=present + ensures the instances are running
+ec2_state: running
+ec2_image_id: "ami-0497a974f8d5dcef8"
+
+#TCP Ports
+grafana_port: 3000
+prometheus_port: 9090
+node_exporter_port: 9100
+blackbox_port: 9115
+
+# Route 53
+route53_zone: "ddev.sg"
+route53_grafana: "grafana.sara.ddev.sg"
+route53_promethues: "prometheus.sara.ddev.sg"
+ 
+
+
+
+#settings for Grafana
+grafana_version: "10.2.3"
+enable_grafana: true
+# enable_grafana_import: true
+# grafana_url: "http://grafana.sara.ddev.sg:{{ grafana_port }}"
+# grafana_etc_dir: "/etc/grafana"
+# grafana_provision_dir: "/etc/grafana/provisioning"
+
+# grafana_dashboard_ids:
+#   - 1860 #NE
+#   - 13659 #B HTTP
+#   - 7587 #PM B HTTP
+#   - 14928 # B Scapper
+#   - 3500 # Grafana Internal
+
+
+blackbox_exporter_serviceName: "blackbox_exporter"
+blackbox_exporter_bin: /usr/local/bin/blackbox_exporter
+blackbox_exporter_user: blackbox_exporter
+blackbox_exporter_group: "{{ blackbox_exporter_user }}"
+exec_command: /usr/local/bin/blackbox_exporter --config.file /etc/blackbox_exporter/blackbox.yml
+blackbox_exporter_version: 0.25.0
+blackbox_exporter_dir_conf: /etc/node_exporter
+
+
+node_exporter_version: "1.7.0"
+node_exporter_bin: /usr/local/bin/node_exporter
+node_exporter_user: node_exporter
+node_exporter_group: "{{ node_exporter_user }}"
+node_exporter_dir_conf: /etc/node_exporter
+
+enable_node_exporter: true
+enable_prometheus: true
+enable_blackbox_exporter: true
+enable_alertmanager: true
+
+prometheus_serviceName: "prometheus"
+prometheus_version: "2.52.0"
+prometheus_dir_configuration: "/etc/prometheus"
+# prometheus_retention_time: "15d"
+# prometheus_scrape_interval: "30s"
+# prometheus_node_exporter: true
+# prometheus_node_exporter_group: "all"
+# prometheus_env: "production"
+# prometheus_var_config:
+#   global:
+#     scrape_interval: "{{ prometheus_scrape_interval }}"
+#     evaluation_interval: 5s
+#     external_labels:
+#       env: '{{ prometheus_env }}'
+#   scrape_configs:
+#     - job_name: prometheus
+#       scrape_interval: 5m
+#       static_configs:
+#         - targets: ['{{ inventory_hostname }}:9090']
+
+prometheus_db_dir: "var/lib/prometheus"
+prometheus_retention_time: "30d"
+prometheus_scrape_interval: "30s"
+prometheus_node_exporter: true
+prometheus_node_exporter_group: "all"
+prometheus_env: "production"
+prometheus_var_config:
+  global:
+    scrape_interval: "{{ prometheus_scrape_interval }}"
+    evaluation_interval: 5s
+    external_labels:
+      env: '{{ prometheus_env }}'
+  scrape_configs:
+    - job_name: prometheus
+      scrape_interval: 5m
+      static_configs:
+        - targets: ['{{ inventory_hostname }}:9090']

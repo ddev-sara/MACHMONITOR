@@ -1,0 +1,54 @@
+---
+- name: install grafana
+  hosts: aws
+  become: true
+  gather_facts: false
+  module_defaults:
+    group/aws:
+      profile: ""
+  vars:
+    tmp: /tmp/ansible
+
+  tasks:
+  - name: Include defaults from configs/defaults.yml
+    ansible.builtin.include_vars:
+      file: configs/defaults.yml
+
+  - name: Include grafana Role
+    ansible.builtin.include_role:
+      name: "grafana"  
+    when: enable_grafana and (inventory_hostname in groups["grafana"])
+
+  - name: Get EC2 Instance Info
+    amazon.aws.ec2_instance_info:
+      access_key: "{{ aws_access_key_id }}"
+      secret_key: "{{ aws_secret_access_key }}"
+      region: "{{ region }}"
+      filters:
+        "tag:Environment": "Monitor"
+        "tag:Name": "{{ inventory_hostname }}"
+    register: ec2_infos
+    when: enable_grafana and (inventory_hostname in groups["grafana"])
+    delegate_to: localhost
+    ignore_unreachable: true
+ 
+  - name: Display EC2 Information
+    ansible.builtin.debug:
+      var: ec2_infos
+    when: enable_grafana and (inventory_hostname in groups["grafana"])
+ 
+  - name: Set Variables
+    ansible.builtin.set_fact:
+      instance_id: "{{ ec2_infos.instances[0].instance_id }}"
+      vpc_id: "{{ ec2_infos.instances[0].vpc_id }}"
+      subnet_id: "{{ ec2_infos.instances[0].subnet_id }}"
+      security_group: "{{ ec2_infos.instances[0].security_groups }}"
+    when: enable_grafana and (inventory_hostname in groups["grafana"])
+
+  - name: Include Grafana ElB
+    ansible.builtin.include_role:
+      name: "aws_elb"
+    tags:
+      - setup
+      - grafana
+    when: enable_grafana and (inventory_hostname in groups["grafana"])

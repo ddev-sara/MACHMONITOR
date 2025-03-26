@@ -1,0 +1,171 @@
+---
+- name: Play for AWS EC2 Dashboard
+  hosts: aws
+  gather_facts: false
+  module_defaults:
+    group/aws:
+      profile: ""
+  vars:
+    enable_grafana: false
+    enable_prometheus: true 
+    enable_blackbox_exporter: true
+    enable_node_exporter: true
+    enable_alertmanager: true
+    #http_targets:
+    #  - https://www.yahoo.com.sg
+
+  tasks:
+  - name: Include default from configs/defaults.yml
+    ansible.builtin.include_vars:
+      file: configs/defaults.yml
+
+  - name: Get EC2 Instance Info of Node Exporter
+    amazon.aws.ec2_instance_info:
+      region: "{{ region }}"
+      filters:
+        "tag:Environment": "Monitor"
+        "tag:Name": "{{ inventory_hostname }}"
+    register: ne_ec2_infos
+    when: enable_node_exporter and ( inventory_hostname in groups["node_exporter"])
+    delegate_to: localhost
+    ignore_unreachable: true
+
+  - name: Display Node Exporter EC2 Information
+    ansible.builtin.debug:
+      var: ne_ec2_infos
+    when: enable_node_exporter and ( inventory_hostname in groups["node_exporter"])
+
+  - name: Set Node Exporter Variables
+    ansible.builtin.set_fact:
+      ne_instance_id: "{{ ne_ec2_infos.instances[0].instance_id }}"
+      ne_vpc_id: "{{ ne_ec2_infos.instances[0].vpc_id }}"
+      ne_subnet_id: "{{ ne_ec2_infos.instances[0].subnet_id }}"
+    when: enable_node_exporter and ( inventory_hostname in groups["node_exporter"])
+
+  - name: Display Node Exporter EC2 Information
+    ansible.builtin.debug:
+      msg: "Node Exporter InstanceID: {{ ne_instance_id}} VpcID: {{ ne_vpc_id }} SubnetId: {{ ne_subnet_id}}"
+    when: enable_node_exporter and ( inventory_hostname in groups["node_exporter"])
+
+  - name: Include node_exporter Role
+    ansible.builtin.include_role:
+       name: "node_exporter"
+    when: enable_node_exporter and (inventory_hostname in groups["node_exporter"])
+    tags:
+      - setup
+      - node_exporter
+
+ # Blackbox Exporter EC2 Intances
+  - name: Get Blackbox Exporter EC2 Instance Info
+    amazon.aws.ec2_instance_info:
+      region: "{{ region }}"
+      filters:
+        "tag:Environment": "Monitor"
+        "tag:Name": "{{ inventory_hostname }}"
+    register: be_ec2_infos
+    when: enable_blackbox_exporter and ( inventory_hostname in groups["blackbox_exporter"])
+    delegate_to: localhost
+    ignore_unreachable: true
+
+  - name: Display Blackbox Exporter EC2 Information
+    ansible.builtin.debug:
+      var: be_ec2_infos
+    when: enable_blackbox_exporter and ( inventory_hostname in groups["blackbox_exporter"])
+
+  - name: Set Blackbox Exporter EC2 Information
+    ansible.builtin.set_fact:
+      be_instance_id: "{{ be_ec2_infos.instances[0].instance_id }}"
+      be_vpc_id: "{{ be_ec2_infos.instances[0].vpc_id }}"
+      be_subnet_id: "{{ be_ec2_infos.instances[0].subnet_id }}"
+    when: enable_blackbox_exporter and (inventory_hostname in groups["blackbox_exporter"])
+
+  - name: Display Blackbox Exporter EC2 Information
+    ansible.builtin.debug:
+      msg: "Blackbox Exporter InstanceID: {{ be_instance_id}} VpcId: {{ be_vpc_id }} SubnetId: {{ be_subnet_id}}"
+    when: enable_blackbox_exporter and (inventory_hostname in groups["blackbox_exporter"])
+
+  - name: Include blackbox_exporter Role
+    ansible.builtin.include_role:
+       name: "blackbox_exporter"
+    when: enable_blackbox_exporter and (inventory_hostname in groups["blackbox_exporter"])
+    tags:
+      - setup
+      - blackbox_exporter
+    
+
+
+
+  #  # Prometheus EC2 instances
+  # - name: Get Prometheus EC2 Instance Info
+  #   amazon.aws.ec2_instance_info:
+  #     region: "{{ region }}"
+  #     filters:
+  #       "tag:ENV": "Monitor"
+  #       "tag:Name": "{{ inventory_hostname }}"
+  #   register: prom_ec2_infos
+  #   when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+  #   delegate_to: localhost
+  #   ignore_unreachable: true 
+
+  - name: Get Prometheus EC2 Instance Role
+    amazon.aws.ec2_instance_info: 
+      region: "ap-southeast-1"
+      filters: 
+        "tag:Environment": "Monitor"
+        "tag:Name": "{{ inventory_hostname }}"
+    register: prom_ec2_infos
+    when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+    delegate_to: localhost
+    ignore_unreachable: true
+
+  - name: Display Prometheus EC2 Information
+    ansible.builtin.debug:
+     var: prom_ec2_infos
+    when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+
+  - name: Gather information VPC public subnet
+    amazon.aws.ec2_vpc_subnet_info:
+      filters:
+        "tag:Name": "Sara Public 1a ap-southeast-1a" #Define and tag the public subnet
+    when: enable_prometheus and ( inventory_hostname in groups["prometheus"])
+    register: prom_public_subnet
+    ignore_unreachable: true
+    delegate_to: localhost
+
+  - name: Display Prometheus VPC Public Information
+    ansible.builtin.debug:
+     var: prom_public_subnet
+    when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+
+  - name: Set Prometheus Variables
+    ansible.builtin.set_fact:
+      prom_instance_id: "{{ prom_ec2_infos.instances[0].instance_id }}"
+      prom_vpc_id: "{{ prom_ec2_infos.instances[0].vpc_id }}"
+      prom_subnet_id: "{{ prom_ec2_infos.instances[0].subnet_id }}"
+      prom_security_group: "{{ prom_ec2_infos.instances[0].security_groups }}"
+      prom_public_subnet_id: "{{ prom_public_subnet.subnets[0].subnet_id }}"
+    when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+
+  - name: Display Prometheus EC2 Information
+    ansible.builtin.debug:
+      msg: "Prometheus InstanceID: {{ prom_instance_id }} VpcID: {{ prom_vpc_id }} SubnetId: {{ prom_subnet_id }} Public Subnet:{{prom_public_subnet_id}}"
+    when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+
+  # Setup Prometheus
+  - name: Include Prometheus Role
+    ansible.builtin.include_role:
+       name: "prometheus"
+    when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+    tags:
+      - setup
+      - prometheus
+
+  - name: Include Prometheus ELB
+    ansible.builtin.include_role:
+      name: "aws_elb"
+    tags:
+      - setup
+      - prometheus
+    when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+  
+

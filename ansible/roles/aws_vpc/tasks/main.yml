@@ -1,0 +1,177 @@
+---
+- name: Create VPC in AWS
+  amazon.aws.ec2_vpc_net:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    name: "{{ vpc_name }}"
+    cidr_block: "{{ vpc_cidr_block }}"
+    region: "{{ region }}"
+    tenancy: default
+    state: "{{vpc_state}}"
+    tags:
+      ENV: "Monitor"
+  register: ec2_vpc_net_result
+
+- name: Create Public {{ zone_1a }} VPC Subnet
+  amazon.aws.ec2_vpc_subnet:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    vpc_id: "{{ec2_vpc_net_result.vpc.id}}"
+    region: "{{region}}"
+    az: "{{zone_1a}}"
+    cidr: "{{public1a_subnet_cidr_block}}"
+    state: present
+    resource_tags:
+      Name: "Sara Public 1a {{ zone_1a }}"
+  register: public1_subnet_result
+
+- name: Create Public {{ zone_1b }} VPC Subnet
+  amazon.aws.ec2_vpc_subnet:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    vpc_id: "{{ec2_vpc_net_result.vpc.id}}"
+    region: "{{region}}"
+    az: "{{zone_1b}}"
+    cidr: "{{public1b_subnet_cidr_block}}"
+    state: present
+    resource_tags:
+      Name: "Sara Public 1b {{ zone_1b }}"
+  register: public2_subnet_result
+
+- name: Create Private {{ zone_1a }} VPC Subnet
+  amazon.aws.ec2_vpc_subnet:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    vpc_id: "{{ec2_vpc_net_result.vpc.id}}"
+    region: "{{region}}"
+    az: "{{zone_1a}}"
+    cidr: "{{private1a_subnet_cidr_block}}"
+    state: present
+    resource_tags:
+      Name: "Sara Private 1a {{ zone_1a }}"
+  register: private1_subnet_result
+
+- name: Create Private {{ zone_1b }} VPC Subnet
+  amazon.aws.ec2_vpc_subnet:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    vpc_id: "{{ec2_vpc_net_result.vpc.id}}"
+    region: "{{region}}"
+    az: "{{zone_1b}}"
+    cidr: "{{private1b_subnet_cidr_block}}"
+    state: present
+    resource_tags:
+      Name: "Sara Private 1b {{ zone_1b }}"
+  register: private2_subnet_result
+
+- name: Create Internet Gateway for VPC
+  amazon.aws.ec2_vpc_igw:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    vpc_id: "{{ ec2_vpc_net_result.vpc.id }}"
+    region: "{{ region }}"
+    state: present
+    tags:
+      Name: "{{ igw_name }}"
+      ENV: "SARADASH"
+      Network: "Public"
+  register: igw_result 
+
+- name: Create NAT Gateway and Allocate New EIP
+  amazon.aws.ec2_vpc_nat_gateway:
+    state: present
+    subnet_id: "{{ public1_subnet_result.subnet.id }}"
+    wait: true
+    if_exist_do_not_create: true
+    region: "{{ region }}"
+    tags:
+      Name: "{{ nat_name }}"
+      Network: "Public"
+      ENV: "Monitor"
+  register: nat_result
+
+- name: Create VPC Public Subnet Route Table
+  amazon.aws.ec2_vpc_route_table:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    vpc_id: "{{ ec2_vpc_net_result.vpc.id }}"
+    region: "{{ region }}"
+    state: "{{ vpc_state }}"
+    tags:
+      Name: "{{ title }} IGW - RT"
+      Network: "Public"
+    subnets:
+      - "{{ public1_subnet_result.subnet.id }}"
+      - "{{ public2_subnet_result.subnet.id }}"
+    routes:
+      - dest: "{{ internet_cidr_block }}"
+        gateway_id: "{{ igw_result.gateway_id }}"
+  register: public1_route_table
+
+- name: Create VPC Private Subnet Route Table
+  amazon.aws.ec2_vpc_route_table:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    vpc_id: "{{ ec2_vpc_net_result.vpc.id }}"
+    region: "{{ region }}"
+    state: "{{ vpc_state }}"
+    tags:
+      Name: "{{ title }} NAT - RT"
+      Network: "Private"
+    subnets:
+      - "{{ private1_subnet_result.subnet.id }}"
+      - "{{ private2_subnet_result.subnet.id }}"
+    routes:
+      - dest: "{{ internet_cidr_block }}"
+        gateway_id: "{{ nat_result.nat_gateway_id }}"
+  register: private1_route_table  
+
+- name: Create Security Group
+  amazon.aws.ec2_group:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    vpc_id: "{{ ec2_vpc_net_result.vpc.id }}"
+    region: "{{ region }}"
+    state: present
+    name: "{{ security_group_name }}"
+    description: "{{ security_group_name }} For {{ title }}"
+    tags:
+      Name: "{{ security_group_name }}"
+    rules:
+      - proto: tcp
+        from_port: 22
+        to_port: 22
+        cidr_ip: "{{ internet_cidr_block }}"
+        rule_desc: allow SSH traffic
+      - proto: tcp
+        from_port: 9115
+        to_port: 9115
+        cidr_ip: "{{ internet_cidr_block }}"
+        rule_desc: allow Custom TCP traffic
+      - proto: tcp
+        from_port: 9090
+        to_port: 9090
+        cidr_ip: "{{ internet_cidr_block }}"
+        rule_desc: allow Custom TCP traffic
+      - proto: tcp
+        from_port: 9100
+        to_port: 9100
+        cidr_ip: "{{ internet_cidr_block }}"
+        rule_desc: allow Custom TCP traffic
+      - proto: tcp
+        from_port: 3000
+        to_port: 3000
+        cidr_ip: "{{ internet_cidr_block }}"
+        rule_desc: allow Custom TCP traffic
+      - proto: tcp
+        from_port: 80
+        to_port: 80
+        cidr_ip: "{{ internet_cidr_block }}"
+        rule_desc: allow HTTP traffic
+      - proto: tcp
+        from_port: 443
+        to_port: 443
+        cidr_ip: "{{ internet_cidr_block }}"
+        rule_desc: allow HTTPS traffic
+  register: security_group_results
+ 

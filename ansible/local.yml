@@ -1,0 +1,108 @@
+---
+- name: Play for Setup AWS VPC
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  module_defaults:
+    group/aws:
+      profile: ""
+  vars:
+    tmp: /tmp/ansible
+  tasks:
+  - name: Include defaults from configs/defaults.yml
+    ansible.builtin.include_vars:
+      file: configs/defaults.yml
+ 
+  - name: Display defaults vars
+    ansible.builtin.debug:
+      msg: "{{ vars }}"
+
+  - name: Include AWS VPC Role
+    ansible.builtin.include_role:
+      name: "aws_vpc"
+    tags:
+      - setup
+      - vpc
+ 
+
+- name: Play to create EC2
+  hosts: aws
+  gather_facts: false
+  module_defaults:
+    group/aws:
+      profile: ""
+  tasks:
+    - name: Include default from configs/default.yml
+      ansible.builtin.include_vars:
+        file: configs/defaults.yml
+ 
+    # - name: Display default vars
+    #   ansible.builtin.debug:
+    #     msg: "{{ vars }}"   
+ 
+    - name: Set Variables
+      ansible.builtin.set_fact:
+       public1_subnet_id: "{{hostvars['localhost'].public1_subnet_result.subnet.id}}"
+       public2_subnet_id: "{{hostvars['localhost'].public2_subnet_result.subnet.id}}"
+       security_group_id: "{{hostvars['localhost'].security_group_results.group_id}}"
+       private1_subnet_id: "{{hostvars['localhost'].private1_subnet_result.subnet.id}}"
+       private2_subnet_id: "{{hostvars['localhost'].private2_subnet_result.subnet.id}}"
+       vpc_id: "{{hostvars['localhost'].ec2_vpc_net_result.vpc.id}}"
+  
+    - name: Display default vars
+      ansible.builtin.debug:
+        msg: "public1_subnet_id: {{ public1_subnet_id }} private1_subnet_id: {{ private1_subnet_id }} public2_subnet_id: {{ public2_subnet_id }} private2_subnet_id: {{ private2_subnet_id }}"
+ 
+    - name: Include AWS EC2 Role
+      ansible.builtin.include_role:
+        name: "ec2"  
+      when: enable_ec2
+      tags:
+        - setup
+        - ec2
+
+
+
+# - name: install grafana
+#   hosts: grafana
+#   become: true
+#   gather_facts: false
+#   module_defaults:
+#     group/aws:
+#       profile: ""
+#   vars:
+#     tmp: /tmp/ansible
+#   tasks:
+#   - name: Include defaults from configs/defaults.yml
+#     ansible.builtin.include_vars:
+#       file: configs/defaults.yml
+#   - name: Include grafana Role
+#     ansible.builtin.include_role:
+#       name: "grafana"  
+#     when: enable_grafana
+
+#   - name: Include Grafana ElB
+#     ansible.builtin.include_role:
+#       name: "aws_elb"
+#     tags:
+#       - setup
+#       - grafana
+
+
+# - name: install prometheus
+#   hosts: prometheus
+#   become: true
+#   gather_facts: false
+#   module_defaults:
+#     group/aws:
+#       profile: ""
+#   vars:
+#     tmp: /tmp/ansible
+#   tasks:
+#   - name: Include defaults from configs/defaults.yml
+#     ansible.builtin.include_vars:
+#       file: configs/defaults.yml
+#   - name: Include prometheus Role
+#     ansible.builtin.include_role:
+#       name: "prometheus"
+#     when: enable_prometheus

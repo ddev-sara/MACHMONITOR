@@ -1,0 +1,101 @@
+---
+- name: Creating blackbox_exporter user group
+  group: name="{{ blackbox_exporter_group }}"
+  become: true
+
+- name: Creating blackbox_exporter user
+  user:
+    name: "{{ blackbox_exporter_user }}"
+    group: "{{ blackbox_exporter_group }}"
+    system: true
+    shell: "/usr/sbin/nologin"
+    system: true
+    comment: "{{ blackbox_exporter_user }} nologin User"
+    createhome: false
+    state: present
+  become: true
+
+- name: check if blackbox exporter exist
+  stat:
+    path: "{{ blackbox_exporter_bin }}"
+  register: __check_blackbox_exporter_present
+
+- name: create blackbox exporter config dir
+  file:     #File module - It sets or remove attributes of files, symlinks, or directories.
+    path: "{{ blackbox_exporter_dir_conf }}"
+    state: directory
+    owner: "{{blackbox_exporter_user}}"
+    group: "{{ blackbox_exporter_group }}"
+  become: true
+# - name: if blackbox exporter exist get version
+#   shell: "cat /etc/systemd/system/init.service | grep Version | sed s/'.*Version '//g"
+#   when: __check_node_exporter_present.stat.exists == true
+#   changed_when: false
+#   register: __get_blackbox_exporter_version
+
+ ##Install prometheus blackbox exporter
+- name: download and unzip blackbox exporter if not exist
+  unarchive:
+    src: "https://github.com/prometheus/blackbox_exporter/releases/download/v{{ blackbox_exporter_version }}/blackbox_exporter-{{ blackbox_exporter_version }}.linux-amd64.tar.gz"
+    dest: /tmp/
+    remote_src: yes
+
+- name: Copy blackbox exporter file to bin
+  copy:    #copy module copies a file from the local or remote machine to a location on the remote machine.
+    src: "/tmp/blackbox_exporter-{{ blackbox_exporter_version }}.linux-amd64/blackbox_exporter"
+    dest: "/usr/local/bin/blackbox_exporter"
+    owner: "{{ blackbox_exporter_user }}"
+    group: "{{ blackbox_exporter_group }}"
+    remote_src: yes
+    mode: 0777
+  become: true
+
+- name: Delete blackbox exporter tmp folder
+  file:
+    path: '/tmp/blackbox_exporter-{{ blackbox_exporter_version }}.linux-amd64'
+    state: absent
+
+- name: Creates directory
+  file: 
+    path: "/etc/blackbox_exporter/"
+    state: directory
+    owner: "{{ black_exporter_user }}"
+    group: "{{ blackbox_exporter_group }}"
+    mode: 0755
+  become: true
+
+- name: Copy blackbox exporter config file
+  template:
+    src: blackbox.yml.j2
+    dest: /etc/blackbox_exporter/blackbox.yml
+    owner: "{{ blackbox_exporter_user }}"
+    group: "{{ blackbox_exporter_group }}"
+  become: true
+
+- name: Copy systemd init file
+  template:
+    src: init.service.j2
+    dest: /etc/systemd/system/blackbox_exporter.service
+  notify: restart_blackbox_exporter
+  become: true
+
+- name: Start blackbox_exporter service
+  service:      #service module enables you to start, stop, and reload installed packages
+    name: blackbox_exporter
+    state: started
+    enabled: yes
+  become: yes
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+    name: blackbox_exporter
+    state: restarted
+    enabled: yes
+  become: yes
+
+- name: Check if blackbox_exporter is accessible
+  uri:
+    url: http://localhost:9115
+    method: GET
+    status_code: 200

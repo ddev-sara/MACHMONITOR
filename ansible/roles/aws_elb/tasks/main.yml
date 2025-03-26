@@ -1,0 +1,127 @@
+---
+- name : Create {{ grafana_port }} Grafana Target Group
+  community.aws.elb_target_group:
+    name: "GrafanaTG"
+    access_key: "{{ aws_access_key_id }}"
+    secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ region }}"
+    protocol: tcp
+    port: "{{ grafana_port }}"
+    vpc_id: "{{ vpc_id }}"
+    targets: 
+      - Id: "{{ instance_id }}"
+        Port: "{{ grafana_port }}"
+    state: present
+  when: enable_grafana and ( inventory_hostname in groups["grafana"])
+  delegate_to: localhost
+  ignore_errors: true
+
+- name : Create Network LB for Grafana
+  community.aws.elb_network_lb:
+    name: MonitorGrafanaNLB
+    access_key: "{{ aws_access_key_id }}"
+    secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ region }}"
+    subnets:
+      - "{{ subnet_id }}"
+    listeners:
+      - Protocol: TCP
+        Port: "{{ grafana_port }}"
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: GrafanaTG
+    state: present
+    purge_listeners: false
+  when: enable_grafana and ( inventory_hostname in groups["grafana"] )
+  register: grafana_nlb_info
+  delegate_to: localhost
+  ignore_errors: true
+
+- name : Add Grafana Alias Record that point to Grafana ELB
+  amazon.aws.route53:
+    overwrite: true 
+    state: present
+    access_key: "{{ aws_access_key_id }}"
+    secret_key: "{{ aws_secret_access_key }}"
+    zone: "{{ route53_zone }}"
+    record: "{{ route53_grafana }}"
+    type: A
+    value: "{{ grafana_nlb_info.dns_name }}"
+    alias: true 
+    alias_hosted_zone_id: "{{ grafana_nlb_info.canonical_hosted_zone_id }}"
+  when: enable_grafana and ( inventory_hostname in groups["grafana"])
+  register: grafana_route53_info
+  delegate_to: localhost
+  ignore_errors: true 
+   
+#Prometheus
+- name: Create {{ prometheus_port }} Prometheus Target Group
+  community.aws.elb_target_group:
+    name: "PrometheusTGSara"
+    access_key: "{{ aws_access_key_id }}"
+    secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ region }}"
+    protocol: tcp
+    port: "{{prometheus_port }}"
+    vpc_id: "{{prom_vpc_id }}"
+    targets: 
+      - Id: "{{ prom_instance_id }}"
+        Port: "{{ prometheus_port }}"
+    state: present
+  when: enable_prometheus and ( inventory_hostname in groups["prometheus"])
+  delegate_to: localhost
+  ignore_errors: true
+  
+- name: Create Network LB For Prometheus
+  community.aws.elb_network_lb:
+    name: MonitorPromNLB
+    subnets:
+      - "{{ prom_public_subnet_id }}"
+    listeners:
+      - Protocol: TCP  # required.the protocol for connections from clients to the load balancer
+        Port: "{{ prometheus_port }}"  #Required.  the port on wich the load balancer is listener
+        DefaultActions:
+          - Type: forward  #required.only forward is accepted at this time
+            TargetGroupName: PrometheusTGSara  #required.the name of the target group
+    state: present
+    purge_listeners: false
+  when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+  register: prometheus_nlb_info
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Display Prometheus DNS Route53 Information
+  ansible.builtin.debug:
+    msg: "DNS Name {{ prometheus_nlb_info.dns_name }} Alias {{ prometheus_nlb_info.canonical_hosted_zone_id }}"
+  when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+
+- name : Add Prometheus Alias Record that point to Prometheus ELB
+  amazon.aws.route53:
+    state: present
+    zone: "{{ route53_zone}}"
+    record: "{{ route53_promethues }}"
+    type: A
+    value: "{{ prometheus_nlb_info.dns_name }}"
+    # overwrite: true
+    alias: true
+    alias_hosted_zone_id: "{{ prometheus_nlb_info.canonical_hosted_zone_id }}"
+  when: enable_prometheus and ( inventory_hostname in groups["prometheus"])
+  register: prometheus_route53_info
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Display Prometheus DNS Route53 Information
+  ansible.builtin.debug:
+    msg: "Route53 Info After {{ prometheus_route53_info }} "
+  when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+  
+
+- name: Tag EC2 Prometheus Instance With Tag:Group
+  amazon.aws.ec2_tag:
+    resource: "{{ prom_instance_id }}"
+    tags:
+      Group: "{{ group_names }}"
+    state: present
+  when: enable_prometheus and (inventory_hostname in groups["prometheus"])
+  delegate_to: localhost
+  ignore_errors: true

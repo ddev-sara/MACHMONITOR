@@ -1,0 +1,63 @@
+[all:vars]
+# Make adminuser as only ansible user to connect to server
+# Existing playbook always assume adminuser as the user to execute ansible
+# On local machine, it will assume ssh as adminuser
+ansible_connection=ssh
+ansible_ssh_user=ubuntu
+private_key_file=/Users/saravanan/.ssh/SARAKEYPAIRNEW.pem
+ansible_ssh_private_key_file=/Users/saravanan/.ssh/SARAKEYPAIRNEW.pem
+grafana_admin_password=admin
+ansible_python_interpreter=/usr/bin/python3.10
+
+[aws_public_1a]
+SARAPUBLIC01 ansible_host_private=10.46.0.100
+
+[aws_public_1b]
+SARAPUBLIC02 ansible_host_private=10.46.2.100
+
+[aws_public:children]
+aws_public_1a
+aws_public_1b
+
+[aws_private_1a]
+SARAPRIVATE01 ansible_host_private=10.46.1.100
+
+[aws_private_1b]
+SARAPRIVATE02 ansible_host_private=10.46.3.100
+SARAPRIVATE03 ansible_host_private=10.46.3.101
+
+[aws_private:children]
+aws_private_1a
+aws_private_1b
+
+[aws:children]
+aws_public
+aws_private
+
+[grafana]
+SARAPUBLIC01 ansible_host_private=10.46.0.100
+
+[prometheus]
+SARAPRIVATE01
+
+[node_exporter]
+SARAPRIVATE01
+SARAPRIVATE02
+SARAPRIVATE03
+
+[blackbox_exporter]
+SARAPRIVATE01
+
+[loki]
+
+[prometheus]
+SARAPRIVATE01 ansible_host_private=10.46.1.100
+
+
+[node_exporter]
+SARAPUBLIC01 ansible_host_private=10.46.0.100
+SARAPRIVATE01 ansible_host_private=10.46.1.100  ansible_user=ubuntu  ansible_ssh_private_key_file=/Users/saravanan/.ssh/SARAKEYPAIRNEW.pem
+SARAPRIVATE02 ansible_host_private=10.46.3.100  ansible_ssh_private_key_file=/Users/saravanan/.ssh/SARAKEYPAIRNEW.pem
+
+#[blackbox_exporter]
+#SARAPRIVATE02 ansible_host_private=10.46.3.100

@@ -1,0 +1,71 @@
+# my global config
+# Sara config
+global:
+  scrape_interval: 15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  - job_name: 'prometheus'
+    scrape_interval: 5s
+    static_configs:
+      - targets:
+{% for host in groups['prometheus'] %}
+        - {{ hostvars[host]['ansible_host_private'] | default(host) }}:9090
+{% endfor %}      
+  - job_name: 'node_exporter'
+    scrape_interval: 5s
+    static_configs:
+      - targets:
+{% for host in groups['node_exporter'] %}
+        - {{ hostvars[host]['ansible_host_private'] | default(host) }}:9100
+{% endfor %}
+
+  #Grafana configuration
+  - job_name: 'grafana_metrics'
+    scrape_interval: 15s
+    scrape_timeout: 5s
+    static_configs:
+      - targets:
+{% for host in groups['grafana'] %}
+        - {{ hostvars[host]['ansible_host_private'] | default(host) }}:{{ grafana_port }}
+{% endfor %}
+
+  - job_name: 'blackbox_exporter_metrics'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://www.google.com
+        - https://www.youtube.com
+        - https://sg.yahoo.com
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+{% for host in groups['blackbox_exporter'] %}
+        replacement: {{ hostvars[host]['ansible_host_private'] | default(host) }}:9115
+{% endfor %}
+
+  - job_name: 'blackbox_exporter' #collect blackbox_exporter metrics
+    static_configs:
+      - targets:
+        - 10.46.1.100:9115
+
