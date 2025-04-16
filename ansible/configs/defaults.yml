@@ -46,17 +46,17 @@ route53_promethues: "prometheus.sara.ddev.sg"
 #settings for Grafana
 grafana_version: "10.2.3"
 enable_grafana: true
-# enable_grafana_import: true
-# grafana_url: "http://grafana.sara.ddev.sg:{{ grafana_port }}"
-# grafana_etc_dir: "/etc/grafana"
-# grafana_provision_dir: "/etc/grafana/provisioning"
+enable_grafana_import: true
+grafana_url: "http://grafana.sara.ddev.sg:{{ grafana_port }}"
+grafana_etc_dir: "/etc/grafana"
+grafana_provision_dir: "/etc/grafana/provisioning"
 
-# grafana_dashboard_ids:
-#   - 1860 #NE
-#   - 13659 #B HTTP
-#   - 7587 #PM B HTTP
-#   - 14928 # B Scapper
-#   - 3500 # Grafana Internal
+grafana_dashboard_ids:
+  - 1860 #NE
+  - 13659 #B HTTP
+  - 7587 #PM B HTTP
+  - 14928 # B Scapper
+  - 3500 # Grafana Internal
 
 
 blackbox_exporter_serviceName: "blackbox_exporter"
