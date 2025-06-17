@@ -87,11 +87,16 @@
     owner: grafana
     group: grafana
     mode: '0644'
-  become: true
   with_items:
     - { src: "dashboards.yml.j2", dest: "{{ grafana_provision_dir }}/dashboards/dashboards.yml"}
     - { src: "datasource.yml.j2", dest: "{{ grafana_provision_dir }}/datasources/datasource.yml"}
- 
+    - { src: "datasourcegithub.yml.j2", dest: "{{ grafana_provision_dir }}/datasources/datasourcesgithub.yml"}
+  vars:
+    enable_datasource_github: true
+  when: enable_grafana and (inventory_hostname in groups['grafana'])
+  become: true
+
+
 - name: "Copy Dashboards JSON to {{ grafana_provision_dir }}"
   ansible.builtin.copy:
     src: "{{ item.src }}"
@@ -103,10 +108,11 @@
     - { src: "files/dashboards/NodeExporter.json", dest: "{{ grafana_provision_dir }}/dashboards/NodeExporter.json"}
     - { src: "files/dashboards/BlackBoxHTTPProber.json", dest: "{{ grafana_provision_dir }}/dashboards/BlackBoxHTTPProber.json"}
     - { src: "files/dashboards/Prometheus.json", dest: "{{ grafana_provision_dir }}/dashboards/Prometheus.json"}
-  notify:
-    - Restart grafana-server
-  become: true
+    - { src: "files/dashboards/GithubDefault.json", dest: "{{ grafana_provision_dir }}/dashboards/GithubDefault.json"}
   when: enable_grafana and (inventory_hostname in groups['grafana'])
+  #notify:
+  # - Restart grafana-server
+  become: true
 
 # - name: wait for service up
 #   uri:
@@ -117,29 +123,41 @@
 #   retries: 120
 #   delay: 1
  
-# - name: Install/update Grafana github datasource plugin
-#   community.grafana.grafana_plugin:
-#     name: {{ item }}
-#     version: latest
-#     state: present
-#   with_items:
-#     - grafana-github-datasource
-#     - aws-datasource-provisioner-app
-#   # when: ( enable_datasource_github and enable_datasource_aws ) and (inventory_hostname in groups['grafana'])
+- name: Install Grafana GitHub datasource plugin
+  community.grafana.grafana_plugin:
+    name: grafana-github-datasource
+    version: latest
+    state: present
+  when:
+    - enable_datasource_github | default(false)
+    - inventory_hostname in groups['grafana']
+  become: true
  
-# - name: Import Grafana Dashboards
-#   community.grafana.grafana_dashboard:
-#     #grafana_url: http://grafana.company.com
-#     url: "{{ grafana_url }}"
-#     folder: "{{ title}} SARA"
-#     dashboard_id: "{{ item }}"
-#     org_id: 1
-#     overwrite: true
-#     url_password: "Admin"
-#   loop: "{{ grafana_dashboard_ids }}"
-#   notify:
-#     - Restart grafana-server
-#   when: enable_grafana_import and (inventory_hostname in groups['grafana'])
+- name: Install Grafana AWS datasource plugin
+  community.grafana.grafana_plugin:
+    name: aws-datasource-provisioner-app
+    version: latest
+    state: present
+  when:
+    - enable_datasource_aws | default(false)
+    - inventory_hostname in groups['grafana']
+  become: true
+ 
+ 
+- name: Install/update Grafana github datasource plugin
+  community.grafana.grafana_plugin:
+    name: "{{ items }}"
+    version: latest
+    state: present
+  with_items:
+    - grafana-github-datasource
+    - aws-datasource-provisioner-app
+  when: (enable_datasource_github | default(false)) and (enable_datasource_aws | default(false)) and (inventory_hostname in groups['grafana'])
+  # notify:
+  #   - Restart grafana-server
+  become: true
+ 
+
  
 - name : Reload and Restart systemd for grafana
   ansible.builtin.systemd_service:
